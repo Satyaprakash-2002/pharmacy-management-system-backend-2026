@@ -1,61 +1,112 @@
 from rest_framework import serializers
 from .models import User
+from retailers.models import Retailer
+from branches.models import Branch
 
 
-# Serializer used to display user information.
-# This is mainly used when returning user data through APIs.
-class UserSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = User
-
-        # Fields that can be returned through the API.
-        fields = [
-            "id",
-            "username",
-            "email",
-            "first_name",
-            "last_name",
-            "role",
-            "retailer",
-            "branch",
-        ]
-
-
-# Serializer used when creating a new user.
-# This handles registration/user creation.
-class UserRegistrationSerializer(serializers.ModelSerializer):
-
-    # Password is accepted when creating a user,
-    # but it will never be returned in the API response.
-    password = serializers.CharField(
-        write_only=True,
-        min_length=8
-    )
+class SuperAdminCreateSerializer(serializers.ModelSerializer):
+    retailer_id = serializers.IntegerField(write_only=True)
+    password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-
         fields = [
             "username",
             "email",
             "password",
             "first_name",
             "last_name",
-            "role",
-            "retailer",
-            "branch",
+            "retailer_id",
         ]
 
-    # Creates the user and securely hashes the password.
     def create(self, validated_data):
-        password = validated_data.pop("password")
+        retailer_id = validated_data.pop("retailer_id")
 
-        user = User(**validated_data)
+        try:
+            retailer = Retailer.objects.get(id=retailer_id)
+        except Retailer.DoesNotExist:
+            raise serializers.ValidationError(
+                {"retailer_id": "Retailer does not exist."}
+            )
 
-        # Hash the password before saving it.
-        user.set_password(password)
+        user = User.objects.create_user(
+            username=validated_data["username"],
+            email=validated_data.get("email", ""),
+            password=validated_data["password"],
+            first_name=validated_data.get("first_name", ""),
+            last_name=validated_data.get("last_name", ""),
+            role=User.Role.RETAILER_ADMIN,
+            retailer=retailer,
+            branch=None,
+        )
 
-        user.save()
+        return user
+
+
+class AdminCreateSerializer(serializers.ModelSerializer):
+    branch_id = serializers.IntegerField(write_only=True)
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "username",
+            "email",
+            "password",
+            "first_name",
+            "last_name",
+            "branch_id",
+        ]
+
+    def create(self, validated_data):
+        branch_id = validated_data.pop("branch_id")
+
+        try:
+            branch = Branch.objects.get(id=branch_id)
+        except Branch.DoesNotExist:
+            raise serializers.ValidationError(
+                {"branch_id": "Branch does not exist."}
+            )
+
+        user = User.objects.create_user(
+            username=validated_data["username"],
+            email=validated_data.get("email", ""),
+            password=validated_data["password"],
+            first_name=validated_data.get("first_name", ""),
+            last_name=validated_data.get("last_name", ""),
+            role=User.Role.BRANCH_ADMIN,
+            retailer=branch.retailer,
+            branch=branch,
+        )
+
+        return user
+
+
+class StaffUserCreateSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "username",
+            "email",
+            "password",
+            "first_name",
+            "last_name",
+        ]
+
+    def create(self, validated_data):
+        creator = self.context["request"].user
+
+        user = User.objects.create_user(
+            username=validated_data["username"],
+            email=validated_data.get("email", ""),
+            password=validated_data["password"],
+            first_name=validated_data.get("first_name", ""),
+            last_name=validated_data.get("last_name", ""),
+            role=self.context["role"],
+            retailer=creator.retailer,
+            branch=creator.branch,
+        )
 
         return user

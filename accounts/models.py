@@ -1,39 +1,3 @@
-# from django.contrib.auth.models import AbstractUser
-# from django.db import models
-
-
-# # Custom User model for the Pharmacy Management System.
-# # Uses Django's built-in authentication system through AbstractUser.
-# class User(AbstractUser):
-
-#     # Defines the different roles available in the SaaS platform.
-#     # These roles will later be used for role-based access control.
-#     class Role(models.TextChoices):
-
-#         # Platform-level user who manages the entire SaaS platform.
-#         PLATFORM_OWNER = "PLATFORM_OWNER", "Platform Owner"
-
-#         # User who manages a retailer and its branches.
-#         RETAILER_ADMIN = "RETAILER_ADMIN", "Retailer Admin"
-
-#         # User who manages a specific branch.
-#         BRANCH_ADMIN = "BRANCH_ADMIN", "Branch Admin"
-
-#         # User responsible for pharmacy-related operations.
-#         PHARMACIST = "PHARMACIST", "Pharmacist"
-
-#         # User responsible for billing and sales operations.
-#         CASHIER = "CASHIER", "Cashier"
-
-#         # General branch staff member.
-#         STAFF = "STAFF", "Staff"
-
-#     # Stores the user's role for role-based access control.
-#     role = models.CharField(
-#         max_length=30,
-#         choices=Role.choices,
-#         default=Role.STAFF,
-#     )
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
