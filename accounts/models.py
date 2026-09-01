@@ -42,3 +42,11 @@ class User(AbstractUser):
         blank=True,
         related_name="users",
     )
+
+    def save(self, *args, **kwargs):
+     if self.is_superuser:
+        self.role = self.Role.PLATFORM_OWNER
+        self.retailer = None
+        self.branch = None
+
+     super().save(*args, **kwargs)
