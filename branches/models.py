@@ -14,10 +14,10 @@ class Branch(models.Model):
     name = models.CharField(max_length=150)
 
     # Physical address of the branch.
-    address = models.TextField()
+    address = models.TextField(blank=True, default="")
 
     # Contact number of the branch.
-    phone = models.CharField(max_length=15)
+    phone = models.CharField(max_length=15, blank=True, default="")
 
     # Indicates whether the branch is currently active.
     is_active = models.BooleanField(default=True)
