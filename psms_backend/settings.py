@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'accounts',
     'retailers',
     'branches',
+    'subscriptions',
 ]
 
 # Django REST Framework configuration

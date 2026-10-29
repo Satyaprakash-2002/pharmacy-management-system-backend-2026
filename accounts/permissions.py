@@ -27,3 +27,15 @@ class IsBranchAdmin(BasePermission):
             request.user.is_authenticated
             and request.user.role == User.Role.BRANCH_ADMIN
         )
+
+
+class IsRetailerOrBranchAdmin(BasePermission):
+
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated
+            and request.user.role in [
+                User.Role.RETAILER_ADMIN,
+                User.Role.BRANCH_ADMIN,
+            ]
+        )
