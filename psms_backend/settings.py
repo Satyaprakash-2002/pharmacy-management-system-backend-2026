@@ -143,14 +143,29 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 
-# Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
+# # Email
+# # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+# MAILERS = {
+#     'default': {
+#         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
+#     },
+# }
+
+#-----------------------------------------------------------#
+# Frontend URL
+#-----------------------------------------------------------#
+
+FRONTEND_URL = "http://localhost:3000"
+
+
+#-----------------------------------------------------------#
+# Email Configuration - Development Testing
+#-----------------------------------------------------------#
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = "Pharmacy ERP <noreply@example.com>"
 
 # Custom User model used by the Pharmacy Management System.
 # Django's built-in authentication system will use this model.

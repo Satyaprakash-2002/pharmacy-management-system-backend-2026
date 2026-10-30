@@ -16,6 +16,11 @@ from accounts.models import User
 from branches.models import Branch
 from subscriptions.models import Plan, Subscription, SubscriptionHistory
 
+from django.conf import settings
+from django.core.mail import send_mail
+
+from accounts.utils import generate_password_setup_token
+
 
 # -----------------------------------------------------------#
 # Calculate Subscription End Date
@@ -62,6 +67,142 @@ def calculate_subscription_end_date(start_date, plan):
 
 
 # -----------------------------------------------------------#
+# Send Retailer Welcome Email
+# -----------------------------------------------------------#
+
+def send_retailer_welcome_email(
+    retailer,
+    retailer_admin,
+    default_branch,
+    subscription,
+    raw_token,
+):
+
+    # Build the password setup URL using the frontend URL.
+    frontend_url = getattr(
+        settings,
+        "FRONTEND_URL",
+        "http://localhost:3000",
+    ).rstrip("/")
+
+    password_setup_url = (
+        f"{frontend_url}/set-password/{raw_token}"
+    )
+
+    plan = subscription.plan
+
+    # Find the other active plans available for upgrades.
+    available_plans = Plan.objects.filter(
+        is_active=True,
+        is_trial=False,
+    ).exclude(
+        id=plan.id,
+    ).order_by("price")
+
+    # Prepare the upgrade plan details.
+    upgrade_details = []
+
+    for upgrade_plan in available_plans:
+
+        upgrade_details.append(
+            f"""
+{upgrade_plan.name}
+
+Price: ₹{upgrade_plan.price:.2f}
+Duration: {upgrade_plan.duration_months} month(s)
+Users Allowed: {upgrade_plan.max_users}
+Branches Allowed: {upgrade_plan.max_branches}
+Medicines Allowed: {upgrade_plan.max_medicines}
+"""
+        )
+
+    if not upgrade_details:
+        upgrade_text = "No other paid plans are currently available."
+    else:
+        upgrade_text = "\n".join(upgrade_details)
+
+    # Format trial and paid plan duration.
+    if plan.is_trial:
+        plan_type = "Free Trial"
+        duration_text = f"{plan.trial_duration_days} days"
+        billing_cycle = "Trial"
+    else:
+        plan_type = "Paid"
+        duration_text = f"{plan.duration_months} month(s)"
+        billing_cycle = "Monthly" if plan.duration_months == 1 else "Multi-month"
+
+    # Build the welcome email.
+    subject = "Welcome to Pharmacy ERP - Your Account Details"
+
+    message = f"""
+Hello {retailer_admin.first_name or retailer_admin.username},
+
+Your retailer account has been created successfully.
+
+RETAILER DETAILS
+================
+
+Retailer Name: {retailer.name}
+Username: {retailer_admin.username}
+Email: {retailer_admin.email}
+
+BRANCH DETAILS
+==============
+
+Branch Name: {default_branch.name}
+Branch ID: {default_branch.id}
+
+CURRENT SUBSCRIPTION DETAILS
+============================
+
+Plan Name: {plan.name}
+Plan Type: {plan_type}
+Price: ₹{plan.price:.2f}
+Duration: {duration_text}
+Max Users: {plan.max_users}
+Max Branches: {plan.max_branches}
+Max Medicines: {plan.max_medicines}
+
+SUBSCRIPTION INFORMATION
+========================
+
+Start Date: {subscription.start_date}
+Expiry Date: {subscription.end_date}
+Status: {subscription.status}
+Billing Cycle: {billing_cycle}
+
+SET YOUR PASSWORD
+=================
+
+Set your password using the secure link below:
+
+{password_setup_url}
+
+This link will expire in 24 hours and can only be used once.
+
+AVAILABLE UPGRADE PLANS
+=======================
+
+{upgrade_text}
+
+For subscription upgrades, renewals, or technical support,
+please contact the Platform Support Team.
+
+Regards,
+Pharmacy ERP Team
+"""
+
+    # Send the email using the configured Django email backend.
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[retailer_admin.email],
+        fail_silently=False,
+    )
+
+
+# -----------------------------------------------------------#
 # Retailer Registration Serializer
 # -----------------------------------------------------------#
 
@@ -70,11 +211,6 @@ class RetailerCreateSerializer(serializers.ModelSerializer):
     admin_username = serializers.CharField(write_only=True)
 
     admin_email = serializers.EmailField(write_only=True)
-
-    admin_password = serializers.CharField(
-        write_only=True,
-        trim_whitespace=False,
-    )
 
     admin_first_name = serializers.CharField(
         write_only=True,
@@ -100,7 +236,6 @@ class RetailerCreateSerializer(serializers.ModelSerializer):
             "name",
             "admin_username",
             "admin_email",
-            "admin_password",
             "admin_first_name",
             "admin_last_name",
             "plan_id",
@@ -163,7 +298,6 @@ class RetailerCreateSerializer(serializers.ModelSerializer):
 
         admin_username = validated_data.pop("admin_username")
         admin_email = validated_data.pop("admin_email")
-        admin_password = validated_data.pop("admin_password")
 
         admin_first_name = validated_data.pop(
             "admin_first_name",
@@ -190,7 +324,7 @@ class RetailerCreateSerializer(serializers.ModelSerializer):
         retailer_admin = User.objects.create_user(
             username=admin_username,
             email=admin_email,
-            password=admin_password,
+            password=None,
             first_name=admin_first_name,
             last_name=admin_last_name,
             role=User.Role.RETAILER_ADMIN,
@@ -256,6 +390,28 @@ class RetailerCreateSerializer(serializers.ModelSerializer):
             changed_by=self.context["request"].user,
             action=SubscriptionHistory.Action.ASSIGNED,
             notes="Initial subscription assigned during retailer creation.",
+        )
+
+        # -----------------------------------------------------------#
+        # Generate Password Setup Token
+        # -----------------------------------------------------------#
+
+        raw_token = generate_password_setup_token(
+            retailer_admin
+        )
+
+        # -----------------------------------------------------------#
+        # Send Welcome Email After Database Commit
+        # -----------------------------------------------------------#
+
+        transaction.on_commit(
+            lambda: send_retailer_welcome_email(
+                retailer=retailer,
+                retailer_admin=retailer_admin,
+                default_branch=default_branch,
+                subscription=subscription,
+                raw_token=raw_token,
+            )
         )
 
         # -----------------------------------------------------------#
