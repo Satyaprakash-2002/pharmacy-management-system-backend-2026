@@ -47,11 +47,14 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
 
-    # Local applications
+    #-----------------------------------------------------------#
+    # Local Applications
+    #-----------------------------------------------------------#
     'accounts',
     'retailers',
     'branches',
     'subscriptions',
+    'notifications',
 ]
 
 # Django REST Framework configuration
@@ -160,12 +163,19 @@ FRONTEND_URL = "http://localhost:3000"
 
 
 #-----------------------------------------------------------#
-# Email Configuration - Development Testing
+# Email Configuration - Gmail SMTP
 #-----------------------------------------------------------#
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
-DEFAULT_FROM_EMAIL = "Pharmacy ERP <noreply@example.com>"
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
+
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+
+DEFAULT_FROM_EMAIL = f"Pharmacy ERP <{EMAIL_HOST_USER}>"
 
 # Custom User model used by the Pharmacy Management System.
 # Django's built-in authentication system will use this model.

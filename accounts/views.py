@@ -16,6 +16,7 @@ from .serializers import (
 from .permissions import (
     IsRetailerAdmin,
     IsBranchAdmin,
+    IsSubscriptionActiveOrReadOnly,
     IsRetailerOrBranchAdmin,
 )
 
@@ -220,7 +221,10 @@ class LoginView(APIView):
 
 class CreateAdminView(APIView):
 
-    permission_classes = [IsRetailerAdmin]
+    permission_classes = [
+        IsRetailerAdmin,
+        IsSubscriptionActiveOrReadOnly,
+    ]
 
     def post(self, request):
 
@@ -319,7 +323,10 @@ class CreateAdminView(APIView):
 
 class CreateBranchUserView(APIView):
 
-    permission_classes = [IsBranchAdmin]
+    permission_classes = [
+        IsBranchAdmin,
+        IsSubscriptionActiveOrReadOnly,
+    ]
 
     def post(self, request):
 
@@ -494,7 +501,10 @@ class BranchUserListView(APIView):
 
 class UserUpdateView(APIView):
 
-    permission_classes = [IsRetailerOrBranchAdmin]
+    permission_classes = [
+        IsRetailerOrBranchAdmin,
+        IsSubscriptionActiveOrReadOnly,
+    ]
 
     def put(self, request, user_id):
 

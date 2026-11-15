@@ -1,7 +1,7 @@
 
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 # Imports
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 
 from django.utils import timezone
 
@@ -17,12 +17,15 @@ from .serializers import (
 )
 
 from subscriptions.models import Subscription
-from accounts.permissions import IsRetailerAdmin
+from accounts.permissions import (
+    IsRetailerAdmin,
+    IsSubscriptionActiveOrReadOnly,
+)
 
 
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 # Get Current Active Subscription
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 
 def get_current_subscription(retailer):
 
@@ -43,9 +46,9 @@ def get_current_subscription(retailer):
     )
 
 
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 # Get Subscription Awaiting Trial Selection
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 
 def get_trial_selection_subscription(retailer):
 
@@ -62,21 +65,24 @@ def get_trial_selection_subscription(retailer):
     )
 
 
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 # Create Branch
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 
 class CreateBranchView(APIView):
 
-    permission_classes = [IsRetailerAdmin]
+    permission_classes = [
+        IsRetailerAdmin,
+        IsSubscriptionActiveOrReadOnly,
+    ]
 
     def post(self, request):
 
         retailer = request.user.retailer
 
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
         # Validate Retailer
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
 
         if retailer is None:
             return Response(
@@ -90,9 +96,9 @@ class CreateBranchView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
         # Check Subscription State
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
 
         subscription = get_current_subscription(retailer)
         trial_selection = get_trial_selection_subscription(retailer)
@@ -127,9 +133,9 @@ class CreateBranchView(APIView):
                 status=status.HTTP_201_CREATED,
             )
 
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
         # Require an Active Subscription
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
 
         if subscription is None:
             return Response(
@@ -143,9 +149,9 @@ class CreateBranchView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
         # Prevent Additional Branches During the Trial
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
 
         if subscription.plan.is_trial:
             return Response(
@@ -158,9 +164,9 @@ class CreateBranchView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
         # Enforce Paid Plan Branch Limit
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
 
         active_branch_count = Branch.objects.filter(
             retailer=retailer,
@@ -177,9 +183,9 @@ class CreateBranchView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
         # Validate Branch Data
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
 
         serializer = BranchCreateSerializer(data=request.data)
 
@@ -189,9 +195,9 @@ class CreateBranchView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
         # Save New Branch
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
 
         branch = serializer.save(retailer=retailer)
 
@@ -214,9 +220,9 @@ class CreateBranchView(APIView):
         )
 
 
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 # List Retailer's Branches
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 
 class BranchListView(APIView):
 
@@ -248,13 +254,16 @@ class BranchListView(APIView):
         )
 
 
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 # Update Branch Details
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 
 class BranchUpdateView(APIView):
 
-    permission_classes = [IsRetailerAdmin]
+    permission_classes = [
+        IsRetailerAdmin,
+        IsSubscriptionActiveOrReadOnly,
+    ]
 
     def put(self, request, branch_id):
 
@@ -314,13 +323,16 @@ class BranchUpdateView(APIView):
         )
 
 
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 # Update Branch Active Status
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 
 class BranchStatusView(APIView):
 
-    permission_classes = [IsRetailerAdmin]
+    permission_classes = [
+        IsRetailerAdmin,
+        IsSubscriptionActiveOrReadOnly,
+    ]
 
     def patch(self, request, branch_id):
 
@@ -365,9 +377,9 @@ class BranchStatusView(APIView):
             branch.is_active,
         )
 
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
         # Check Restrictions When Activating a Branch
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
 
         if requested_is_active and not branch.is_active:
 
@@ -433,9 +445,9 @@ class BranchStatusView(APIView):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
         # Save Branch Status
-        #-----------------------------------------------------------#
+        # -----------------------------------------------------------#
 
         branch = serializer.save()
 
