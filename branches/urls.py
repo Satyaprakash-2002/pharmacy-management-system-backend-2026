@@ -5,6 +5,7 @@ from .views import (
     BranchListView,
     BranchUpdateView,
     BranchStatusView,
+    BranchDeleteView,
 )
 
 urlpatterns = [
@@ -30,5 +31,11 @@ urlpatterns = [
         "<int:branch_id>/status/",
         BranchStatusView.as_view(),
         name="branch-status",
+    ),
+
+    path(
+        "<int:branch_id>/delete/",
+        BranchDeleteView.as_view(),
+        name="delete-branch",
     ),
 ]

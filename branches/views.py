@@ -69,6 +69,161 @@ def get_trial_selection_subscription(retailer):
 # Create Branch
 # -----------------------------------------------------------#
 
+# class CreateBranchView(APIView):
+
+#     permission_classes = [
+#         IsRetailerAdmin,
+#         IsSubscriptionActiveOrReadOnly,
+#     ]
+
+#     def post(self, request):
+
+#         retailer = request.user.retailer
+
+#         # -----------------------------------------------------------#
+#         # Validate Retailer
+#         # -----------------------------------------------------------#
+
+#         if retailer is None:
+#             return Response(
+#                 {"error": "Your account is not linked to a retailer."},
+#                 status=status.HTTP_403_FORBIDDEN,
+#             )
+
+#         if not retailer.is_active:
+#             return Response(
+#                 {"error": "Your retailer account is inactive."},
+#                 status=status.HTTP_403_FORBIDDEN,
+#             )
+
+#         # -----------------------------------------------------------#
+#         # Check Subscription State
+#         # -----------------------------------------------------------#
+
+#         subscription = get_current_subscription(retailer)
+#         trial_selection = get_trial_selection_subscription(retailer)
+
+#         # Allow branch setup before the trial starts.
+#         # Branch limits will be enforced after trial selection.
+#         if trial_selection is not None:
+#             serializer = BranchCreateSerializer(data=request.data)
+
+#             if not serializer.is_valid():
+#                 return Response(
+#                     serializer.errors,
+#                     status=status.HTTP_400_BAD_REQUEST,
+#                 )
+
+#             branch = serializer.save(retailer=retailer)
+
+#             return Response(
+#                 {
+#                     "message": (
+#                         "Branch created successfully. Select one branch "
+#                         "to activate your 15-day Free Trial."
+#                     ),
+#                     "branch": {
+#                         "id": branch.id,
+#                         "name": branch.name,
+#                         "address": branch.address,
+#                         "phone": branch.phone,
+#                         "is_active": branch.is_active,
+#                     },
+#                 },
+#                 status=status.HTTP_201_CREATED,
+#             )
+
+#         # -----------------------------------------------------------#
+#         # Require an Active Subscription
+#         # -----------------------------------------------------------#
+
+#         if subscription is None:
+#             return Response(
+#                 {
+#                     "error": (
+#                         "You do not have an active subscription or a "
+#                         "Free Trial awaiting branch selection. "
+#                         "Please activate a trial or obtain a paid plan."
+#                     )
+#                 },
+#                 status=status.HTTP_403_FORBIDDEN,
+#             )
+
+#         # -----------------------------------------------------------#
+#         # Prevent Additional Branches During the Trial
+#         # -----------------------------------------------------------#
+
+#         if subscription.plan.is_trial:
+#             return Response(
+#                 {
+#                     "error": (
+#                         "Additional branches cannot be created during "
+#                         "the Free Trial. Upgrade to a paid plan first."
+#                     )
+#                 },
+#                 status=status.HTTP_403_FORBIDDEN,
+#             )
+
+#         # -----------------------------------------------------------#
+#         # Enforce Paid Plan Branch Limit
+#         # -----------------------------------------------------------#
+
+#         active_branch_count = Branch.objects.filter(
+#             retailer=retailer,
+#             is_active=True,
+#         ).count()
+
+#         if active_branch_count >= subscription.plan.max_branches:
+#             return Response(
+#                 {
+#                     "error": "Your subscription branch limit has been reached.",
+#                     "branch_limit": subscription.plan.max_branches,
+#                     "active_branches": active_branch_count,
+#                 },
+#                 status=status.HTTP_403_FORBIDDEN,
+#             )
+
+#         # -----------------------------------------------------------#
+#         # Validate Branch Data
+#         # -----------------------------------------------------------#
+
+#         serializer = BranchCreateSerializer(data=request.data)
+
+#         if not serializer.is_valid():
+#             return Response(
+#                 serializer.errors,
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         # -----------------------------------------------------------#
+#         # Save New Branch
+#         # -----------------------------------------------------------#
+
+#         branch = serializer.save(retailer=retailer)
+
+#         return Response(
+#             {
+#                 "message": "Branch created successfully.",
+#                 "branch": {
+#                     "id": branch.id,
+#                     "name": branch.name,
+#                     "address": branch.address,
+#                     "phone": branch.phone,
+#                     "is_active": branch.is_active,
+#                     "retailer": {
+#                         "id": retailer.id,
+#                         "name": retailer.name,
+#                     },
+#                 },
+#             },
+#             status=status.HTTP_201_CREATED,
+#         )
+
+
+# -----------------------------------------------------------#
+# Create Branch
+# -----------------------------------------------------------#
+
 class CreateBranchView(APIView):
 
     permission_classes = [
@@ -103,9 +258,24 @@ class CreateBranchView(APIView):
         subscription = get_current_subscription(retailer)
         trial_selection = get_trial_selection_subscription(retailer)
 
-        # Allow branch setup before the trial starts.
-        # Branch limits will be enforced after trial selection.
+        # -----------------------------------------------------------#
+        # Allow Only One Branch During Free Trial Selection
+        # -----------------------------------------------------------#
+
         if trial_selection is not None:
+
+            existing_branch_count = Branch.objects.filter(
+                retailer=retailer,
+            ).count()
+
+            if existing_branch_count >= 1:
+                return Response(
+                    {
+                        "error": "Only one branch is allowed during the Free Trial."
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
             serializer = BranchCreateSerializer(data=request.data)
 
             if not serializer.is_valid():
@@ -119,7 +289,7 @@ class CreateBranchView(APIView):
             return Response(
                 {
                     "message": (
-                        "Branch created successfully. Select one branch "
+                        "Branch created successfully. Select this branch "
                         "to activate your 15-day Free Trial."
                     ),
                     "branch": {
@@ -168,17 +338,16 @@ class CreateBranchView(APIView):
         # Enforce Paid Plan Branch Limit
         # -----------------------------------------------------------#
 
-        active_branch_count = Branch.objects.filter(
+        total_branch_count = Branch.objects.filter(
             retailer=retailer,
-            is_active=True,
         ).count()
 
-        if active_branch_count >= subscription.plan.max_branches:
+        if total_branch_count >= subscription.plan.max_branches:
             return Response(
                 {
                     "error": "Your subscription branch limit has been reached.",
                     "branch_limit": subscription.plan.max_branches,
-                    "active_branches": active_branch_count,
+                    "total_branches": total_branch_count,
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
@@ -429,21 +598,6 @@ class BranchStatusView(APIView):
                         status=status.HTTP_403_FORBIDDEN,
                     )
 
-            # Enforce branch limits for paid subscriptions.
-            active_branch_count = Branch.objects.filter(
-                retailer=retailer,
-                is_active=True,
-            ).exclude(id=branch.id).count()
-
-            if active_branch_count >= subscription.plan.max_branches:
-                return Response(
-                    {
-                        "error": "Your subscription branch limit has been reached.",
-                        "branch_limit": subscription.plan.max_branches,
-                        "active_branches": active_branch_count,
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
 
         # -----------------------------------------------------------#
         # Save Branch Status
@@ -460,5 +614,45 @@ class BranchStatusView(APIView):
                     "is_active": branch.is_active,
                 },
             },
+            status=status.HTTP_200_OK,
+        )
+
+
+# -----------------------------------------------------------#
+# Delete Branch
+# -----------------------------------------------------------#
+
+class BranchDeleteView(APIView):
+
+    permission_classes = [
+        IsRetailerAdmin,
+        IsSubscriptionActiveOrReadOnly,
+    ]
+
+    def delete(self, request, branch_id):
+
+        retailer = request.user.retailer
+
+        if retailer is None:
+            return Response(
+                {"error": "Your account is not linked to a retailer."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            branch = Branch.objects.get(
+                id=branch_id,
+                retailer=retailer,
+            )
+        except Branch.DoesNotExist:
+            return Response(
+                {"error": "Branch not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        branch.delete()
+
+        return Response(
+            {"message": "Branch deleted successfully."},
             status=status.HTTP_200_OK,
         )
