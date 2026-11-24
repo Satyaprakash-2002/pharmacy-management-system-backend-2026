@@ -23,10 +23,13 @@ from .permissions import (
 from branches.models import Branch
 from subscriptions.models import Subscription
 
+from audit_logs.services import create_audit_log
+from audit_logs.models import BaseAuditLog
 
-#-----------------------------------------------------------#
+
+# -----------------------------------------------------------#
 # Password Setup View
-#-----------------------------------------------------------#
+# -----------------------------------------------------------#
 
 class PasswordSetupView(APIView):
 
@@ -286,6 +289,7 @@ class CreateAdminView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        # Check retailer user limit
         limit_error = check_user_limit(request.user.retailer)
 
         if limit_error:
@@ -294,7 +298,26 @@ class CreateAdminView(APIView):
         serializer = AdminCreateSerializer(data=request.data)
 
         if serializer.is_valid():
+
+            # Create Branch Admin
             admin = serializer.save()
+
+            # Save audit log
+            create_audit_log(
+                module="accounts",
+                user=request.user,
+                action=BaseAuditLog.Action.CREATE,
+                object_id=admin.id,
+                object_name=admin.username,
+                retailer=admin.retailer,
+                branch=admin.branch,
+                new_values={
+                    "username": admin.username,
+                    "email": admin.email,
+                    "role": admin.role,
+                },
+                description="Branch Admin created.",
+            )
 
             return Response(
                 {
@@ -404,6 +427,23 @@ class CreateBranchUserView(APIView):
         if serializer.is_valid():
             user = serializer.save()
 
+            # Save audit log
+            create_audit_log(
+                module="accounts",
+                user=request.user,
+                action=BaseAuditLog.Action.CREATE,
+                object_id=user.id,
+                object_name=user.username,
+                retailer=user.retailer,
+                branch=user.branch,
+                new_values={
+                    "username": user.username,
+                    "email": user.email,
+                    "role": user.role,
+                },
+                description=f"{user.role} created.",
+            )
+
             return Response(
                 {
                     "message": f"{role} created successfully.",
@@ -495,6 +535,7 @@ class BranchUserListView(APIView):
         )
 
 
+
 # ----------------------------------------------------------- #
 # User Update View
 # ----------------------------------------------------------- #
@@ -544,7 +585,41 @@ class UserUpdateView(APIView):
         )
 
         if serializer.is_valid():
+
+            # Store old values before updating
+            old_values = {
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "is_active": user.is_active,
+            }
+
+            # Update user
             user = serializer.save()
+
+            # Store updated values
+            new_values = {
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "is_active": user.is_active,
+            }
+
+            # Save audit log
+            create_audit_log(
+                module="accounts",
+                user=request.user,
+                action=BaseAuditLog.Action.UPDATE,
+                object_id=user.id,
+                object_name=user.username,
+                retailer=user.retailer,
+                branch=user.branch,
+                old_values=old_values,
+                new_values=new_values,
+                description=f"{user.role} updated.",
+            )
 
             return Response(
                 {

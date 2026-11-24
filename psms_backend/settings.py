@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'branches',
     'subscriptions',
     'notifications',
+    'audit_logs'
 ]
 
 # Django REST Framework configuration
