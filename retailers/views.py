@@ -8,6 +8,7 @@ from rest_framework import status
 
 from .serializers import RetailerCreateSerializer
 from accounts.permissions import IsPlatformOwner
+from .models import Retailer
 
 
 # -----------------------------------------------------------#
@@ -89,4 +90,19 @@ class RetailerCreateView(APIView):
         return Response(
             serializer.errors,
             status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def get(self, request):
+
+        retailers = Retailer.objects.all().values(
+            "id",
+            "name",
+        )
+
+        return Response(
+            {
+                "count": retailers.count(),
+                "retailers": list(retailers),
+            },
+            status=status.HTTP_200_OK,
         )
